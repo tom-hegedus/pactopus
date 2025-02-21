@@ -52,7 +52,7 @@ class Game {
                     "It's all nice and easy here",
                     "and noone is actually chasing you."
                 ],
-                ghostSpeed: 1
+                ghostSpeed: 2.3
             },
             2: {
                 name: "Data catalog",
@@ -61,7 +61,7 @@ class Game {
                     "The data and enemies starts flowing",
                     "but more faster here and things gets bit messier."
                 ],
-                ghostSpeed: 1.5
+                ghostSpeed: 2.3 * 1.2
             }
         };
         return configs[level];

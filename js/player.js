@@ -6,8 +6,9 @@ class Player {
         this.height = CELL_SIZE - 2;
         this.direction = DIRECTIONS.RIGHT;
         this.nextDirection = null;
-        this.baseSpeed = 2; // Base speed value
-        this.speed = this.baseSpeed; // Current speed
+        // Level 1 speed is 2.5, Level 2 is 1.2x faster
+        this.baseSpeed = window.currentLevel === 1 ? 2.5 : 2.5 * 1.2;
+        this.speed = this.baseSpeed;
         this.score = 0;
         this.tentacleAngle = 0;
         this.eyeAngle = 0;
@@ -23,7 +24,7 @@ class Player {
         this.tentacleAngle += 0.15;
         this.eyeAngle = Math.sin(this.tentacleAngle) * 0.2;
 
-        const moveAmount = this.baseSpeed * deltaTime;
+        const moveAmount = this.speed * deltaTime; // Use this.speed instead of this.baseSpeed
 
         // Try to change direction if there's a pending direction
         if (this.nextDirection) {
@@ -35,7 +36,7 @@ class Player {
             const distanceX = Math.abs(this.x - cellX);
             const distanceY = Math.abs(this.y - cellY);
             
-            if (distanceX <= this.baseSpeed && distanceY <= this.baseSpeed) {
+            if (distanceX <= this.speed && distanceY <= this.speed) { // Use this.speed here too
                 // We're at a cell center, check if we can turn
                 const nextX = cellX + this.nextDirection.x * CELL_SIZE;
                 const nextY = cellY + this.nextDirection.y * CELL_SIZE;
@@ -66,7 +67,10 @@ class Player {
     }
 
     reset() {
+        // Level 1 speed is 2.5, Level 2 is 1.2x faster
+        this.baseSpeed = window.currentLevel === 1 ? 2.5 : 2.5 * 1.2;
         this.speed = this.baseSpeed;
+        
         this.lastUpdate = performance.now();
         this.direction = DIRECTIONS.RIGHT;
         this.nextDirection = null;
