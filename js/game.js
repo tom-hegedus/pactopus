@@ -55,11 +55,12 @@ class Game {
                 ghostSpeed: 2.3
             },
             2: {
-                name: "Data catalog",
+                name: "Catalog",
                 description: [
-                    "Good job, welcome to data sharing.",
-                    "The data and enemies starts flowing",
-                    "but more faster here and things gets bit messier."
+                    "Good job, welcome to the world",
+                    "of data sharing. There are some",
+                    "shared buckets and you will need",
+                    "to link them by finding proper keys."
                 ],
                 ghostSpeed: 2.3 * 1.2
             }
@@ -208,7 +209,7 @@ class Game {
         
         // Create and show message
         const message = document.createElement('div');
-        message.textContent = `${colorName} key collected!`;
+        message.textContent = `The ${colorName} buckets are linked!`;
         message.style.position = 'absolute';
         message.style.left = '50%';
         message.style.bottom = '10px';  // Position at bottom
@@ -350,11 +351,11 @@ class Game {
                 this.ctx.fillText(line, this.canvas.width / 2, this.canvas.height / 2 - 20 + (index * 20));
             });
             
-            // Draw controls text
+            // Draw controls text with more padding (increased from 80/110 to 120/150)
             this.ctx.fillStyle = '#ffffff';
             this.ctx.font = '16px "Press Start 2P"';
-            this.ctx.fillText('Use arrow keys to move', this.canvas.width / 2, this.canvas.height / 2 + 80);
-            this.ctx.fillText('Press any to start', this.canvas.width / 2, this.canvas.height / 2 + 110);
+            this.ctx.fillText('Use arrow keys to move', this.canvas.width / 2, this.canvas.height / 2 + 120);
+            this.ctx.fillText('Press any to start', this.canvas.width / 2, this.canvas.height / 2 + 150);
         }
 
         // Draw game over screen text
