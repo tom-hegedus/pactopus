@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pacboola</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            font-family: 'Press Start 2P', system-ui, -apple-system, sans-serif;
+        }
+        #gameCanvas {
+            border: 2px solid #0066cc;
+            background-color: #000;
+        }
+        #gameContainer {
+            text-align: center;
+        }
+        #score {
+            color: #0066cc;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        #level {
+            color: #0066cc;
+            font-size: 20px;
+            margin: 10px 0;
+        }
+        .level-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .level-btn {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-family: 'Press Start 2P';
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .level-btn:hover {
+            background: #0052a3;
+        }
+        .level-btn.active {
+            background: #4CAF50;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="level-selector">
+            <button class="level-btn" data-level="1">Level 1</button>
+            <button class="level-btn" data-level="2">Level 2</button>
+        </div>
+        <div id="score">Score: 0</div>
+        <div id="level">Level: 1</div>
+        <canvas id="gameCanvas" width="448" height="496"></canvas>
+    </div>
+    <script src="js/constants.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/ghost.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/maze.js"></script>
+    <script src="js/game.js"></script>
+    <script>
+        // Initialize the game when the page loads
+        window.addEventListener('load', () => {
+            const canvas = document.getElementById('gameCanvas');
+            new Game(canvas);
+        });
+    </script>
+</body>
+</html> 
