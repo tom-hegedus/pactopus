@@ -14,6 +14,7 @@ class Player {
         this.eyeAngle = 0;
         this.lastUpdate = performance.now();
         this.powerBIActive = false;
+        this.powerBIStartTime = 0;  // Track when PowerBI effect started
     }
 
     update(maze) {
@@ -88,10 +89,25 @@ class Player {
             ctx.scale(-1, 1); // Flip horizontally for left movement
         }
 
-        // Draw the octopus body (more round)
-        ctx.fillStyle = this.powerBIActive ? '#F2C811' : COLORS.PLAYER;
+        // Calculate time elapsed since PowerBI effect started
+        const timeElapsed = this.powerBIActive ? (performance.now() - this.powerBIStartTime) : 0;
+        const isBlinking = timeElapsed > 4000; // Start blinking after 4 seconds (3 seconds before end)
+        
+        // Determine color based on PowerBI state and blinking
+        let color = COLORS.PLAYER; // Default blue color
         if (this.powerBIActive) {
-            ctx.shadowColor = '#F2C811';
+            if (isBlinking) {
+                // Blink every 200ms between orange and blue
+                color = Math.floor(timeElapsed / 200) % 2 === 0 ? '#F2C811' : COLORS.PLAYER;
+            } else {
+                color = '#F2C811'; // PowerBI orange color
+            }
+        }
+
+        // Draw the octopus body (more round)
+        ctx.fillStyle = color;
+        if (this.powerBIActive) {
+            ctx.shadowColor = color;
             ctx.shadowBlur = 15;
         }
         ctx.beginPath();
@@ -120,7 +136,7 @@ class Player {
         // Draw smile
         ctx.beginPath();
         ctx.arc(0, eyeY + eyeSize * 2, eyeSize * 1.5, 0, Math.PI);
-        ctx.strokeStyle = this.powerBIActive ? '#B38F0D' : '#004080';
+        ctx.strokeStyle = this.powerBIActive ? (isBlinking ? (color === '#F2C811' ? '#B38F0D' : '#004080') : '#B38F0D') : '#004080';
         ctx.lineWidth = 2;
         ctx.stroke();
 
@@ -146,7 +162,7 @@ class Player {
             ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
             
             ctx.lineWidth = 4;
-            ctx.strokeStyle = this.powerBIActive ? '#F2C811' : COLORS.PLAYER;
+            ctx.strokeStyle = color;
             ctx.lineCap = 'round';
             ctx.stroke();
         }

@@ -762,6 +762,7 @@ class Game {
                     powerBI.active = false;
                     this.powerBIActive = true;
                     this.player.powerBIActive = true; // Set player's PowerBI state
+                    this.player.powerBIStartTime = performance.now(); // Set the start time
                     
                     // Clear existing PowerBI effect timer
                     if (this.powerBIEffectTimer) {
