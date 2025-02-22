@@ -238,7 +238,7 @@ class Maze {
         return null;
     }
 
-    draw(ctx) {
+    draw(ctx, gooddataActive = false) {
         // Draw walls
         ctx.fillStyle = COLORS.MAZE;
         ctx.strokeStyle = '#004c99';
@@ -267,8 +267,8 @@ class Maze {
             }
         });
 
-        // Draw pellets
-        ctx.fillStyle = COLORS.PELLET;
+        // Draw pellets - pink during Gooddata effect in level 3
+        ctx.fillStyle = (this.level === 3 && gooddataActive) ? '#FF3399' : COLORS.PELLET;
         this.pellets.forEach(pellet => {
             ctx.beginPath();
             ctx.arc(pellet.x, pellet.y, pellet.width / 2, 0, Math.PI * 2);
