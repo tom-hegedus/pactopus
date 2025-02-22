@@ -52,7 +52,7 @@ class Game {
                     "It's all nice and easy here",
                     "and noone is actually chasing you."
                 ],
-                ghostSpeed: 2.3
+                ghostSpeed: 1.5
             },
             2: {
                 name: "Catalog",
@@ -62,7 +62,7 @@ class Game {
                     "shared buckets and you will need",
                     "to link them by finding proper keys."
                 ],
-                ghostSpeed: 2.3 * 1.2
+                ghostSpeed: 1.5 * 1.2
             },
             3: {
                 name: "Components",
@@ -71,7 +71,7 @@ class Game {
                     "sometimes they help,",
                     "sometimes they mess with you."
                 ],
-                ghostSpeed: 2.3 * 1.4
+                ghostSpeed: 1.5 * 1.4
             }
         };
         return configs[level];
