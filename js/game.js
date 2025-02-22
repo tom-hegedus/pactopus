@@ -523,14 +523,18 @@ class Game {
 
         // Draw game over screen text
         if (this.state === GAME_STATES.GAME_OVER) {
-            this.ctx.fillStyle = '#ff0000';
-            this.ctx.font = '32px "Press Start 2P"';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
-            
-            this.ctx.font = '16px "Press Start 2P"';
-            this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
-            this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 50);
+            if (this.level === 3 && this.maze.isComplete()) {
+                this.showFinishScreen();
+            } else {
+                this.ctx.fillStyle = '#ff0000';
+                this.ctx.font = '32px "Press Start 2P"';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
+                
+                this.ctx.font = '16px "Press Start 2P"';
+                this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+                this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 50);
+            }
         }
     }
 
@@ -979,9 +983,44 @@ class Game {
                 this.initGame();
                 this.state = GAME_STATES.READY;
             } else {
-                this.restartGame();
+                // Show finish screen for level 3 completion
+                this.state = GAME_STATES.GAME_OVER;
+                this.showFinishScreen();
             }
         }
+    }
+
+    showFinishScreen() {
+        // Draw semi-transparent black overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Set up text properties
+        this.ctx.textAlign = 'center';
+        
+        // Draw congratulations text
+        this.ctx.fillStyle = '#4CAF50';  // Green color
+        this.ctx.font = '24px "Press Start 2P"';
+        this.ctx.fillText('Congratulations!', this.canvas.width / 2, this.canvas.height / 2 - 80);
+        
+        // Draw main message with smaller font (14px instead of 16px)
+        this.ctx.fillStyle = '#90CAF9';  // Light blue color
+        this.ctx.font = '14px "Press Start 2P"';
+        this.ctx.fillText('You seem to know the platform.', this.canvas.width / 2, this.canvas.height / 2 - 30);
+        this.ctx.fillText('But the dark places of Keboola', this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.fillText('awaits...', this.canvas.width / 2, this.canvas.height / 2 + 30);
+        this.ctx.fillText('Let me know', this.canvas.width / 2, this.canvas.height / 2 + 60);
+        this.ctx.fillText('if you want more levels!', this.canvas.width / 2, this.canvas.height / 2 + 85);
+        
+        // Draw signature
+        this.ctx.fillStyle = '#FF3399';  // Pink color (matching Gooddata)
+        this.ctx.font = '20px "Press Start 2P"';
+        this.ctx.fillText('Tom', this.canvas.width / 2, this.canvas.height / 2 + 120);
+        
+        // Draw restart instruction
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '16px "Press Start 2P"';
+        this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 180);
     }
 }
 
