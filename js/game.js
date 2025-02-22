@@ -22,36 +22,9 @@ class Game {
         this.gooddataActive = false; // Track if Gooddata effect is active
         this.powerBIEffectTimer = null;  // Timer for PowerBI effect duration
         this.gooddataEffectTimer = null; // Timer for Gooddata effect duration
-        this.setupLevelSelector();
         this.initGame();
         console.log('Game initialized');
         this.gameLoop();
-    }
-
-    setupLevelSelector() {
-        const buttons = document.querySelectorAll('.level-btn');
-        buttons.forEach(button => {
-            button.addEventListener('click', () => {
-                const selectedLevel = parseInt(button.dataset.level);
-                this.switchLevel(selectedLevel);
-                
-                // Update active button
-                buttons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-            });
-        });
-        
-        // Set initial active button
-        buttons[0].classList.add('active');
-    }
-
-    switchLevel(newLevel) {
-        this.level = newLevel;
-        this.score = 0;
-        this.updateScore();
-        document.getElementById('level').textContent = `Level: ${this.level}`;
-        this.initGame();
-        this.state = GAME_STATES.READY;
     }
 
     getLevelConfig(level) {
@@ -422,11 +395,6 @@ class Game {
         this.level = 1;
         this.updateScore();
         document.getElementById('level').textContent = `Level: ${this.level}`;
-
-        // Update level selector
-        const buttons = document.querySelectorAll('.level-btn');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        buttons[0].classList.add('active');
 
         // Stop the current game loop
         if (this.animationFrameId) {
@@ -807,6 +775,91 @@ class Game {
             }
         });
 
+        // Check ghost collisions - for all levels
+        if (this.level === 3 && this.powerBIActive) {
+            // PowerBI effect ghost eating logic for level 3
+            for (let i = this.ghosts.length - 1; i >= 0; i--) {
+                const ghost = this.ghosts[i];
+                // Only check collision if ghost is not frozen
+                if (!ghost.frozen && checkCollision(this.player, ghost)) {
+                    // Increase score
+                    this.score += 1000;
+                    this.updateScore();
+                    
+                    // Show score message ONLY when ghost eaten
+                    this.showGameMessage('+1000 Points!', '#F2C811');
+                    
+                    // Define corner areas where ghosts can respawn
+                    const corners = [
+                        { x: 1, y: 1 },     // Top-left corner
+                        { x: 26, y: 1 },    // Top-right corner
+                        { x: 1, y: 26 },    // Bottom-left corner
+                        { x: 26, y: 26 }    // Bottom-right corner
+                    ];
+                    
+                    // Select corner based on ghost index
+                    const corner = corners[i % corners.length];
+                    
+                    // Try positions around the corner until a valid one is found
+                    const offsets = [
+                        { x: 0, y: 0 },     // Try exact corner first
+                        { x: 1, y: 0 },     // Try one cell right
+                        { x: 0, y: 1 },     // Try one cell down
+                        { x: -1, y: 0 },    // Try one cell left
+                        { x: 0, y: -1 },    // Try one cell up
+                        { x: 1, y: 1 },     // Try diagonal
+                        { x: -1, y: 1 },    // Try diagonal
+                        { x: 1, y: -1 },    // Try diagonal
+                        { x: -1, y: -1 }    // Try diagonal
+                    ];
+                    
+                    let validPosition = false;
+                    let newX = corner.x * CELL_SIZE;
+                    let newY = corner.y * CELL_SIZE;
+                    
+                    for (let offset of offsets) {
+                        const testX = newX + offset.x * CELL_SIZE;
+                        const testY = newY + offset.y * CELL_SIZE;
+                        
+                        if (!this.maze.checkCollision(testX, testY, CELL_SIZE - 2, CELL_SIZE - 2)) {
+                            newX = testX;
+                            newY = testY;
+                            validPosition = true;
+                            break;
+                        }
+                    }
+                    
+                    // If no valid position found in corner, use findEmptyPosition
+                    if (!validPosition) {
+                        const pos = this.findEmptyPosition();
+                        newX = pos.x;
+                        newY = pos.y;
+                    }
+                    
+                    // Reset ghost to valid position
+                    ghost.x = newX;
+                    ghost.y = newY;
+                    
+                    // Set ghost to frozen state for 3 seconds
+                    ghost.frozen = true;
+                    if (ghost.frozenTimer) {
+                        clearTimeout(ghost.frozenTimer);
+                    }
+                    ghost.frozenTimer = setTimeout(() => {
+                        ghost.frozen = false;
+                    }, 3000);
+                }
+            }
+        } else {
+            // Normal ghost collision check (game over) - for all levels
+            for (const ghost of this.ghosts) {
+                if (checkCollision(this.player, ghost)) {
+                    this.gameOver();
+                    return;
+                }
+            }
+        }
+
         // Only check special element collisions for level 3
         if (this.level === 3) {
             // Check snowflake collisions
@@ -879,90 +932,6 @@ class Game {
                     // Show PowerBI message ONLY when eaten
                     this.showGameMessage('Power BI! You can eat ghosts now!', '#F2C811');
                     break;
-                }
-            }
-
-            // Check ghost collisions with PowerBI effect
-            if (this.powerBIActive) {
-                for (let i = this.ghosts.length - 1; i >= 0; i--) {
-                    const ghost = this.ghosts[i];
-                    // Only check collision if ghost is not frozen
-                    if (!ghost.frozen && checkCollision(this.player, ghost)) {
-                        // Increase score
-                        this.score += 1000;
-                        this.updateScore();
-                        
-                        // Show score message ONLY when ghost eaten
-                        this.showGameMessage('+1000 Points!', '#F2C811');
-                        
-                        // Define corner areas where ghosts can respawn
-                        const corners = [
-                            { x: 1, y: 1 },     // Top-left corner
-                            { x: 26, y: 1 },    // Top-right corner
-                            { x: 1, y: 26 },    // Bottom-left corner
-                            { x: 26, y: 26 }    // Bottom-right corner
-                        ];
-                        
-                        // Select corner based on ghost index
-                        const corner = corners[i % corners.length];
-                        
-                        // Try positions around the corner until a valid one is found
-                        const offsets = [
-                            { x: 0, y: 0 },     // Try exact corner first
-                            { x: 1, y: 0 },     // Try one cell right
-                            { x: 0, y: 1 },     // Try one cell down
-                            { x: -1, y: 0 },    // Try one cell left
-                            { x: 0, y: -1 },    // Try one cell up
-                            { x: 1, y: 1 },     // Try diagonal
-                            { x: -1, y: 1 },    // Try diagonal
-                            { x: 1, y: -1 },    // Try diagonal
-                            { x: -1, y: -1 }    // Try diagonal
-                        ];
-                        
-                        let validPosition = false;
-                        let newX = corner.x * CELL_SIZE;
-                        let newY = corner.y * CELL_SIZE;
-                        
-                        for (let offset of offsets) {
-                            const testX = newX + offset.x * CELL_SIZE;
-                            const testY = newY + offset.y * CELL_SIZE;
-                            
-                            if (!this.maze.checkCollision(testX, testY, CELL_SIZE - 2, CELL_SIZE - 2)) {
-                                newX = testX;
-                                newY = testY;
-                                validPosition = true;
-                                break;
-                            }
-                        }
-                        
-                        // If no valid position found in corner, use findEmptyPosition
-                        if (!validPosition) {
-                            const pos = this.findEmptyPosition();
-                            newX = pos.x;
-                            newY = pos.y;
-                        }
-                        
-                        // Reset ghost to valid position
-                        ghost.x = newX;
-                        ghost.y = newY;
-                        
-                        // Set ghost to frozen state for 3 seconds
-                        ghost.frozen = true;
-                        if (ghost.frozenTimer) {
-                            clearTimeout(ghost.frozenTimer);
-                        }
-                        ghost.frozenTimer = setTimeout(() => {
-                            ghost.frozen = false;
-                        }, 3000);
-                    }
-                }
-            } else {
-                // Normal ghost collision check (game over)
-                for (const ghost of this.ghosts) {
-                    if (checkCollision(this.player, ghost)) {
-                        this.gameOver();
-                        return;
-                    }
                 }
             }
         }
