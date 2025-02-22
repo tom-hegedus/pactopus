@@ -101,6 +101,9 @@ class Game {
             this.player.speed = this.originalSpeed;
             this.originalSpeed = null;
         }
+        if (this.player) {
+            this.player.powerBIActive = false; // Reset player's PowerBI state
+        }
         this.snowflakes = [];
         this.powerBIs = [];
         this.powerBIActive = false;
@@ -569,28 +572,40 @@ class Game {
         // Draw PowerBI
         ctx.translate(powerBI.x, powerBI.y + pulse);
         
-        // PowerBI orange color
-        ctx.fillStyle = '#F2C811';  // Power BI gold/orange color
+        // PowerBI colors
+        ctx.fillStyle = '#F2C811';  // Power BI gold color
         ctx.strokeStyle = '#F2C811';
         
         // Draw Power BI logo-inspired shape
-        const size = powerBI.width / 2;
+        const size = powerBI.width * 0.8; // Make it larger, similar to snowflake
         
-        // Draw main rectangle
-        ctx.fillRect(-size/2, -size/2, size, size);
-        
-        // Draw diagonal line
-        ctx.beginPath();
-        ctx.moveTo(-size/2, -size/2);
-        ctx.lineTo(size/2, size/2);
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Add glow effect when power is active
+        // Add glow effect
         if (this.powerBIActive) {
             ctx.shadowColor = '#F2C811';
             ctx.shadowBlur = 10;
         }
+        
+        // Draw main shape
+        ctx.lineWidth = 3;
+        
+        // Draw three bars of increasing height
+        const barWidth = size / 4;
+        const maxHeight = size * 0.8;
+        
+        // First (shortest) bar
+        ctx.fillRect(-size/2, maxHeight/4, barWidth, maxHeight/2);
+        
+        // Second (medium) bar
+        ctx.fillRect(-size/2 + barWidth * 1.5, 0, barWidth, maxHeight * 0.75);
+        
+        // Third (tallest) bar
+        ctx.fillRect(-size/2 + barWidth * 3, -maxHeight/4, barWidth, maxHeight);
+        
+        // Draw connecting line on top
+        ctx.beginPath();
+        ctx.moveTo(-size/2, maxHeight/4);
+        ctx.lineTo(-size/2 + barWidth * 4, -maxHeight/4);
+        ctx.stroke();
         
         ctx.restore();
     }
@@ -636,21 +651,20 @@ class Game {
         const validPaths = [
             // Main horizontal paths
             { y: 1, xStart: 2, xEnd: 25 },     // Top row
-            { y: 5, xStart: 2, xEnd: 25 },     // Second row
-            { y: 8, xStart: 2, xEnd: 25 },     // Third row
-            { y: 20, xStart: 2, xEnd: 25 },    // Fourth row
-            { y: 23, xStart: 3, xEnd: 24 },    // Fifth row
-            { y: 28, xStart: 2, xEnd: 25 },    // Bottom row
+            { y: 4, xStart: 2, xEnd: 25 },     // Second row
+            { y: 7, xStart: 2, xEnd: 25 },     // Third row
+            { y: 18, xStart: 2, xEnd: 25 },    // Fourth row
+            { y: 20, xStart: 2, xEnd: 25 },    // Fifth row
+            { y: 23, xStart: 2, xEnd: 25 },    // Bottom row
             
-            // Vertical paths for more variety
-            { x: 13, yStart: 2, yEnd: 27 },    // Left middle column
-            { x: 14, yStart: 2, yEnd: 27 },    // Right middle column
+            // Vertical paths
+            { x: 13, yStart: 2, yEnd: 24 },    // Left middle column
+            { x: 14, yStart: 2, yEnd: 24 }     // Right middle column
         ];
 
-        // First try horizontal paths
         let position = null;
         let attempts = 0;
-        const maxAttempts = 10;
+        const maxAttempts = 20; // Increased attempts to find valid position
 
         while (!position && attempts < maxAttempts) {
             const pathIndex = Math.floor(Math.random() * validPaths.length);
@@ -661,7 +675,7 @@ class Game {
                 const x = (Math.floor(Math.random() * (path.xEnd - path.xStart + 1)) + path.xStart) * CELL_SIZE + CELL_SIZE / 2;
                 const y = path.y * CELL_SIZE + CELL_SIZE / 2;
                 
-                // Verify position is valid
+                // Verify position is valid and not too close to player
                 if (!this.maze.checkCollision(x - CELL_SIZE/2, y - CELL_SIZE/2, CELL_SIZE, CELL_SIZE) &&
                     getDistance(x, y, this.player.x, this.player.y) >= CELL_SIZE * 5) {
                     position = { x, y };
@@ -671,7 +685,7 @@ class Game {
                 const x = path.x * CELL_SIZE + CELL_SIZE / 2;
                 const y = (Math.floor(Math.random() * (path.yEnd - path.yStart + 1)) + path.yStart) * CELL_SIZE + CELL_SIZE / 2;
                 
-                // Verify position is valid
+                // Verify position is valid and not too close to player
                 if (!this.maze.checkCollision(x - CELL_SIZE/2, y - CELL_SIZE/2, CELL_SIZE, CELL_SIZE) &&
                     getDistance(x, y, this.player.x, this.player.y) >= CELL_SIZE * 5) {
                     position = { x, y };
@@ -681,11 +695,11 @@ class Game {
             attempts++;
         }
 
-        // If we couldn't find a valid position after max attempts, use a safe default
+        // If we couldn't find a valid position after max attempts, use a safe default position
         if (!position) {
             position = {
-                x: 14 * CELL_SIZE + CELL_SIZE / 2,
-                y: 14 * CELL_SIZE + CELL_SIZE / 2
+                x: 13 * CELL_SIZE + CELL_SIZE / 2, // Middle of maze
+                y: 7 * CELL_SIZE + CELL_SIZE / 2   // Upper section of maze
             };
         }
 
@@ -747,16 +761,18 @@ class Game {
                 if (powerBI.active && checkCollision(this.player, powerBI)) {
                     powerBI.active = false;
                     this.powerBIActive = true;
+                    this.player.powerBIActive = true; // Set player's PowerBI state
                     
                     // Clear existing PowerBI effect timer
                     if (this.powerBIEffectTimer) {
                         clearTimeout(this.powerBIEffectTimer);
                     }
                     
-                    // Set timer to end PowerBI effect after 10 seconds
+                    // Set timer to end PowerBI effect after 7 seconds
                     this.powerBIEffectTimer = setTimeout(() => {
                         this.powerBIActive = false;
-                    }, 10000);
+                        this.player.powerBIActive = false; // Reset player's PowerBI state
+                    }, 7000);
 
                     // Show PowerBI message
                     this.showGameMessage('Power BI! You can eat ghosts now!', '#F2C811');
@@ -767,7 +783,9 @@ class Game {
             // Check ghost collisions with PowerBI effect
             if (this.powerBIActive) {
                 for (let i = this.ghosts.length - 1; i >= 0; i--) {
-                    if (checkCollision(this.player, this.ghosts[i])) {
+                    const ghost = this.ghosts[i];
+                    // Only check collision if ghost is not frozen
+                    if (!ghost.frozen && checkCollision(this.player, ghost)) {
                         // Increase score
                         this.score += 1000;
                         this.updateScore();
@@ -820,16 +838,16 @@ class Game {
                         }
                         
                         // Reset ghost to valid position
-                        this.ghosts[i].x = newX;
-                        this.ghosts[i].y = newY;
+                        ghost.x = newX;
+                        ghost.y = newY;
                         
                         // Set ghost to frozen state for 3 seconds
-                        this.ghosts[i].frozen = true;
-                        if (this.ghosts[i].frozenTimer) {
-                            clearTimeout(this.ghosts[i].frozenTimer);
+                        ghost.frozen = true;
+                        if (ghost.frozenTimer) {
+                            clearTimeout(ghost.frozenTimer);
                         }
-                        this.ghosts[i].frozenTimer = setTimeout(() => {
-                            this.ghosts[i].frozen = false;
+                        ghost.frozenTimer = setTimeout(() => {
+                            ghost.frozen = false;
                         }, 3000);
                         
                         // Show score message

@@ -13,6 +13,7 @@ class Player {
         this.tentacleAngle = 0;
         this.eyeAngle = 0;
         this.lastUpdate = performance.now();
+        this.powerBIActive = false;
     }
 
     update(maze) {
@@ -88,7 +89,11 @@ class Player {
         }
 
         // Draw the octopus body (more round)
-        ctx.fillStyle = COLORS.PLAYER;
+        ctx.fillStyle = this.powerBIActive ? '#F2C811' : COLORS.PLAYER;
+        if (this.powerBIActive) {
+            ctx.shadowColor = '#F2C811';
+            ctx.shadowBlur = 15;
+        }
         ctx.beginPath();
         ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
         ctx.fill();
@@ -115,23 +120,22 @@ class Player {
         // Draw smile
         ctx.beginPath();
         ctx.arc(0, eyeY + eyeSize * 2, eyeSize * 1.5, 0, Math.PI);
-        ctx.strokeStyle = '#004080';
+        ctx.strokeStyle = this.powerBIActive ? '#B38F0D' : '#004080';
         ctx.lineWidth = 2;
         ctx.stroke();
 
         // Draw tentacles (shorter and thicker)
-        const numTentacles = 6; // Reduced number of tentacles
-        const tentacleLength = this.width * 0.4; // Shorter tentacles
+        const numTentacles = 6;
+        const tentacleLength = this.width * 0.4;
         
         for (let i = 0; i < numTentacles; i++) {
-            const baseAngle = (i * Math.PI * 2 / numTentacles) + Math.PI / 2; // Start from bottom
+            const baseAngle = (i * Math.PI * 2 / numTentacles) + Math.PI / 2;
             const wiggleAngle = Math.sin(this.tentacleAngle + i) * 0.3;
             const tentacleAngle = baseAngle + wiggleAngle;
 
             ctx.beginPath();
-            ctx.moveTo(0, this.height / 3); // Start from bottom of body
+            ctx.moveTo(0, this.height / 3);
             
-            // Control points for curve
             const cp1x = Math.cos(tentacleAngle) * (tentacleLength * 0.5);
             const cp1y = Math.sin(tentacleAngle) * (tentacleLength * 0.5) + this.height / 3;
             const cp2x = Math.cos(tentacleAngle) * (tentacleLength * 0.8);
@@ -141,8 +145,8 @@ class Player {
 
             ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
             
-            ctx.lineWidth = 4; // Thicker tentacles
-            ctx.strokeStyle = COLORS.PLAYER;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = this.powerBIActive ? '#F2C811' : COLORS.PLAYER;
             ctx.lineCap = 'round';
             ctx.stroke();
         }
