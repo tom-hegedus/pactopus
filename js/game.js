@@ -63,6 +63,15 @@ class Game {
                     "to link them by finding proper keys."
                 ],
                 ghostSpeed: 2.3 * 1.2
+            },
+            3: {
+                name: "Components",
+                description: [
+                    "Components are unpredictable—",
+                    "sometimes they help,",
+                    "sometimes they mess with you."
+                ],
+                ghostSpeed: 2.3 * 1.4
             }
         };
         return configs[level];
@@ -91,11 +100,15 @@ class Game {
             startX = 14 * CELL_SIZE;
             startY = 23 * CELL_SIZE;
             ghostY = 11 * CELL_SIZE;
-        } else {
-            // Level 2 starting positions - in the bottom free space
+        } else if (this.level === 2) {
             startX = 14 * CELL_SIZE;
-            startY = 26 * CELL_SIZE; // Bottom area where there's free space
-            ghostY = 1 * CELL_SIZE;  // Top area where there's free space
+            startY = 26 * CELL_SIZE;
+            ghostY = 1 * CELL_SIZE;
+        } else {
+            // Level 3 - Keboola starts in the bottom open area
+            startX = 14 * CELL_SIZE;
+            startY = 26 * CELL_SIZE; // Bottom free space
+            ghostY = 4 * CELL_SIZE;  // Top free space after first walls
         }
         
         this.player = new Player(startX, startY);
@@ -112,13 +125,20 @@ class Game {
                 new Ghost(15 * CELL_SIZE, ghostY, '#00FFFF', ghostSpeed),
                 new Ghost(16 * CELL_SIZE, ghostY, '#FFB852', ghostSpeed)
             ];
-        } else {
-            // Level 2 ghost positions spread across the top free space
+        } else if (this.level === 2) {
             this.ghosts = [
                 new Ghost(3 * CELL_SIZE, ghostY, '#FF0000', ghostSpeed),
                 new Ghost(10 * CELL_SIZE, ghostY, '#FFB8FF', ghostSpeed),
                 new Ghost(18 * CELL_SIZE, ghostY, '#00FFFF', ghostSpeed),
                 new Ghost(24 * CELL_SIZE, ghostY, '#FFB852', ghostSpeed)
+            ];
+        } else {
+            // Level 3 - Spread ghosts in the top free space
+            this.ghosts = [
+                new Ghost(6 * CELL_SIZE, ghostY, '#FF0000', ghostSpeed),
+                new Ghost(12 * CELL_SIZE, ghostY, '#FFB8FF', ghostSpeed),
+                new Ghost(16 * CELL_SIZE, ghostY, '#00FFFF', ghostSpeed),
+                new Ghost(22 * CELL_SIZE, ghostY, '#FFB852', ghostSpeed)
             ];
         }
 
@@ -188,7 +208,7 @@ class Game {
 
         // Check level completion
         if (this.maze.isComplete()) {
-            if (this.level < 2) {
+            if (this.level < 3) {
                 this.level++;
                 this.initGame();
                 this.state = GAME_STATES.READY;
@@ -248,10 +268,15 @@ class Game {
                 startX = 14 * CELL_SIZE;
                 startY = 23 * CELL_SIZE;
                 ghostY = 11 * CELL_SIZE;
-            } else {
+            } else if (this.level === 2) {
                 startX = 14 * CELL_SIZE;
                 startY = 26 * CELL_SIZE;
                 ghostY = 1 * CELL_SIZE;
+            } else {
+                // Level 3 - Match initGame positions
+                startX = 14 * CELL_SIZE;
+                startY = 26 * CELL_SIZE;
+                ghostY = 4 * CELL_SIZE;
             }
             
             this.player.x = startX;
@@ -265,8 +290,14 @@ class Game {
                 this.ghosts.forEach((ghost, index) => {
                     ghost.reset((13 + index) * CELL_SIZE, ghostY);
                 });
-            } else {
+            } else if (this.level === 2) {
                 const ghostXPositions = [3, 10, 18, 24];
+                this.ghosts.forEach((ghost, index) => {
+                    ghost.reset(ghostXPositions[index] * CELL_SIZE, ghostY);
+                });
+            } else {
+                // Level 3 - Match initGame positions
+                const ghostXPositions = [6, 12, 16, 22];
                 this.ghosts.forEach((ghost, index) => {
                     ghost.reset(ghostXPositions[index] * CELL_SIZE, ghostY);
                 });
@@ -341,7 +372,7 @@ class Game {
             
             // Draw level name
             this.ctx.fillStyle = '#4CAF50';
-            this.ctx.font = '24px "Press Start 2P"';
+            this.ctx.font = '20px "Press Start 2P"';
             this.ctx.fillText(`Level ${this.level}: ${config.name}`, this.canvas.width / 2, this.canvas.height / 2 - 60);
             
             // Draw level description
