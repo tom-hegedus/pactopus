@@ -13,11 +13,15 @@ class Game {
         this.lastFrameTime = performance.now();
         this.snowflakes = [];  // Array to hold two snowflakes
         this.powerBIs = [];    // Array to hold two PowerBI elements
+        this.gooddatas = [];   // Array to hold one Gooddata element
         this.snowflakeTimer = null;  // Timer for snowflake respawn
         this.powerBITimer = null;    // Timer for PowerBI respawn
+        this.gooddataTimer = null;   // Timer for Gooddata respawn
         this.originalSpeed = null;  // Store original speed during snowflake effect
         this.powerBIActive = false;  // Track if PowerBI effect is active
+        this.gooddataActive = false; // Track if Gooddata effect is active
         this.powerBIEffectTimer = null;  // Timer for PowerBI effect duration
+        this.gooddataEffectTimer = null; // Timer for Gooddata effect duration
         this.setupLevelSelector();
         this.initGame();
         console.log('Game initialized');
@@ -93,9 +97,17 @@ class Game {
             clearTimeout(this.powerBITimer);
             this.powerBITimer = null;
         }
+        if (this.gooddataTimer) {
+            clearTimeout(this.gooddataTimer);
+            this.gooddataTimer = null;
+        }
         if (this.powerBIEffectTimer) {
             clearTimeout(this.powerBIEffectTimer);
             this.powerBIEffectTimer = null;
+        }
+        if (this.gooddataEffectTimer) {
+            clearTimeout(this.gooddataEffectTimer);
+            this.gooddataEffectTimer = null;
         }
         if (this.originalSpeed !== null && this.player) {
             this.player.speed = this.originalSpeed;
@@ -106,7 +118,9 @@ class Game {
         }
         this.snowflakes = [];
         this.powerBIs = [];
+        this.gooddatas = [];
         this.powerBIActive = false;
+        this.gooddataActive = false;
         
         // Clear all game objects
         this.player = null;
@@ -187,6 +201,33 @@ class Game {
         }, 15000);
     }
 
+    spawnGooddatas() {
+        // Clear existing Gooddatas
+        this.gooddatas = [];
+        
+        // Spawn one new Gooddata
+        let pos = this.findEmptyPosition();
+        
+        this.gooddatas.push({
+            x: pos.x,
+            y: pos.y,
+            width: CELL_SIZE - 4,
+            height: CELL_SIZE - 4,
+            pulseAngle: Math.random() * Math.PI * 2,
+            active: true
+        });
+
+        // Set timer to respawn Gooddata after 15 seconds
+        if (this.gooddataTimer) {
+            clearTimeout(this.gooddataTimer);
+        }
+        this.gooddataTimer = setTimeout(() => {
+            if (this.level === 3 && this.state === GAME_STATES.PLAYING) {
+                this.spawnGooddatas();
+            }
+        }, 15000);
+    }
+
     initGame() {
         // Clean up existing game objects
         this.cleanup();
@@ -213,10 +254,11 @@ class Game {
         // Create player first
         this.player = new Player(startX, startY);
 
-        // Initialize snowflakes and PowerBIs for level 3
+        // Initialize snowflakes, PowerBIs, and Gooddatas for level 3
         if (this.level === 3) {
             this.spawnSnowflakes();
             this.spawnPowerBIs();
+            this.spawnGooddatas();
         }
 
         // Get ghost speed from level config
@@ -413,7 +455,7 @@ class Game {
         // Draw game elements
         if (this.maze) {
             console.log('Drawing maze');
-            this.maze.draw(this.ctx);
+            this.maze.draw(this.ctx, this.gooddataActive);  // Pass gooddataActive to control pellet color
         } else {
             console.log('No maze to draw');
         }
@@ -423,20 +465,23 @@ class Game {
             this.player.draw(this.ctx);
         }
         
-        // Draw snowflakes for level 3
+        // Draw snowflakes, PowerBIs, and Gooddatas for level 3
         if (this.level === 3) {
             this.snowflakes.forEach(snowflake => {
                 if (snowflake.active) {
                     this.drawSnowflake(snowflake);
                 }
             });
-        }
-        
-        // Draw PowerBIs for level 3
-        if (this.level === 3) {
+            
             this.powerBIs.forEach(powerBI => {
                 if (powerBI.active) {
                     this.drawPowerBI(powerBI);
+                }
+            });
+
+            this.gooddatas.forEach(gooddata => {
+                if (gooddata.active) {
+                    this.drawGooddata(gooddata);
                 }
             });
         }
@@ -610,6 +655,47 @@ class Game {
         ctx.restore();
     }
 
+    drawGooddata(gooddata) {
+        const ctx = this.ctx;
+        ctx.save();
+        
+        // Update pulse animation
+        gooddata.pulseAngle += 0.1;
+        const pulse = Math.sin(gooddata.pulseAngle) * 2;
+        
+        // Draw Gooddata
+        ctx.translate(gooddata.x, gooddata.y + pulse);
+        
+        // GoodData logo colors
+        ctx.fillStyle = '#FF3399';  // Pink color
+        ctx.strokeStyle = '#FF3399';
+        
+        // Draw GoodData logo-inspired shape
+        const size = gooddata.width * 1.0;  // Increased from 0.8 to 1.0 to make it bigger
+        
+        // Add glow effect
+        if (this.gooddataActive) {
+            ctx.shadowColor = '#FF3399';
+            ctx.shadowBlur = 10;
+        }
+        
+        // Draw main circle
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw the "G" shape in white
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Draw simplified "G" shape
+        ctx.arc(0, 0, size/3, -Math.PI/4, Math.PI * 1.2, false);
+        ctx.lineTo(size/6, 0);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
     update() {
         const currentTime = performance.now();
         const deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, 0.1);
@@ -711,13 +797,15 @@ class Game {
         this.maze.pellets.forEach((pellet, index) => {
             if (checkCollision(this.player, pellet)) {
                 this.maze.pellets.splice(index, 1);
-                this.score += 10;
+                // Increase score based on Gooddata effect
+                this.score += this.gooddataActive ? 30 : 10;
                 this.updateScore();
             }
         });
 
-        // Check snowflake collisions for level 3
+        // Only check special element collisions for level 3
         if (this.level === 3) {
+            // Check snowflake collisions
             for (let snowflake of this.snowflakes) {
                 if (snowflake.active && checkCollision(this.player, snowflake)) {
                     snowflake.active = false;
@@ -737,26 +825,35 @@ class Game {
                         }
                     }, 5000);
 
-                    // Show snowflake message
+                    // Show snowflake message ONLY when eaten
                     this.showGameMessage('Snowflake! You are slow now!', '#29B5E8');
-
-                    // If all snowflakes are collected, they'll respawn after the timer anyway
                     break;
                 }
             }
-        }
 
-        // Check key collection
-        const collectedKeyColor = this.maze.collectKey(this.player);
-        if (collectedKeyColor) {
-            // Visual feedback for key collection
-            this.showKeyCollectedMessage(collectedKeyColor);
-            this.score += 50; // Bonus points for collecting a key
-            this.updateScore();
-        }
+            // Check Gooddata collisions
+            for (let gooddata of this.gooddatas) {
+                if (gooddata.active && checkCollision(this.player, gooddata)) {
+                    gooddata.active = false;
+                    this.gooddataActive = true;
+                    
+                    // Clear existing Gooddata effect timer
+                    if (this.gooddataEffectTimer) {
+                        clearTimeout(this.gooddataEffectTimer);
+                    }
+                    
+                    // Set timer to end Gooddata effect after 5 seconds
+                    this.gooddataEffectTimer = setTimeout(() => {
+                        this.gooddataActive = false;
+                    }, 5000);
 
-        // Check PowerBI collisions for level 3
-        if (this.level === 3) {
+                    // Show Gooddata message ONLY when eaten
+                    this.showGameMessage('Gooddata! Pellets are worth more!', '#FF3399');
+                    break;
+                }
+            }
+
+            // Check PowerBI collisions
             for (let powerBI of this.powerBIs) {
                 if (powerBI.active && checkCollision(this.player, powerBI)) {
                     powerBI.active = false;
@@ -775,7 +872,7 @@ class Game {
                         this.player.powerBIActive = false; // Reset player's PowerBI state
                     }, 7000);
 
-                    // Show PowerBI message
+                    // Show PowerBI message ONLY when eaten
                     this.showGameMessage('Power BI! You can eat ghosts now!', '#F2C811');
                     break;
                 }
@@ -790,6 +887,9 @@ class Game {
                         // Increase score
                         this.score += 1000;
                         this.updateScore();
+                        
+                        // Show score message ONLY when ghost eaten
+                        this.showGameMessage('+1000 Points!', '#F2C811');
                         
                         // Define corner areas where ghosts can respawn
                         const corners = [
@@ -850,9 +950,6 @@ class Game {
                         ghost.frozenTimer = setTimeout(() => {
                             ghost.frozen = false;
                         }, 3000);
-                        
-                        // Show score message
-                        this.showGameMessage('+1000 Points!', '#F2C811');
                     }
                 }
             } else {
@@ -864,6 +961,15 @@ class Game {
                     }
                 }
             }
+        }
+
+        // Check key collection
+        const collectedKeyColor = this.maze.collectKey(this.player);
+        if (collectedKeyColor) {
+            // Visual feedback for key collection ONLY when key collected
+            this.showKeyCollectedMessage(collectedKeyColor);
+            this.score += 50; // Bonus points for collecting a key
+            this.updateScore();
         }
 
         // Check level completion
