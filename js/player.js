@@ -6,8 +6,8 @@ class Player {
         this.height = CELL_SIZE - 2;
         this.direction = DIRECTIONS.RIGHT;
         this.nextDirection = null;
-        // Level 1 speed is 2.5, Level 2 is 1.2x faster
-        this.baseSpeed = window.currentLevel === 1 ? 2.5 : 2.5 * 1.2;
+        // Level 1 speed is 1.75, Level 2 is 1.2x faster
+        this.baseSpeed = window.currentLevel === 1 ? 1.75 : 1.75 * 1.2;
         this.speed = this.baseSpeed;
         this.score = 0;
         this.tentacleAngle = 0;
@@ -67,8 +67,8 @@ class Player {
     }
 
     reset() {
-        // Level 1 speed is 2.5, Level 2 is 1.2x faster
-        this.baseSpeed = window.currentLevel === 1 ? 2.5 : 2.5 * 1.2;
+        // Level 1 speed is 1.75, Level 2 is 1.2x faster
+        this.baseSpeed = window.currentLevel === 1 ? 1.75 : 1.75 * 1.2;
         this.speed = this.baseSpeed;
         
         this.lastUpdate = performance.now();
