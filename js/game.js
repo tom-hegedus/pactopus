@@ -11,10 +11,17 @@ class Game {
         this.ghosts = [];
         this.maze = null;
         this.lastFrameTime = performance.now();
+        this.snowflakes = [];  // Array to hold two snowflakes
+        this.powerBIs = [];    // Array to hold two PowerBI elements
+        this.snowflakeTimer = null;  // Timer for snowflake respawn
+        this.powerBITimer = null;    // Timer for PowerBI respawn
+        this.originalSpeed = null;  // Store original speed during snowflake effect
+        this.powerBIActive = false;  // Track if PowerBI effect is active
+        this.powerBIEffectTimer = null;  // Timer for PowerBI effect duration
         this.setupLevelSelector();
         this.initGame();
         console.log('Game initialized');
-        this.gameLoop(); // Start game loop immediately
+        this.gameLoop();
     }
 
     setupLevelSelector() {
@@ -71,13 +78,36 @@ class Game {
                     "sometimes they help,",
                     "sometimes they mess with you."
                 ],
-                ghostSpeed: 1.5 * 1.4
+                ghostSpeed: 1.5 * 1.6
             }
         };
         return configs[level];
     }
 
     cleanup() {
+        if (this.snowflakeTimer) {
+            clearTimeout(this.snowflakeTimer);
+            this.snowflakeTimer = null;
+        }
+        if (this.powerBITimer) {
+            clearTimeout(this.powerBITimer);
+            this.powerBITimer = null;
+        }
+        if (this.powerBIEffectTimer) {
+            clearTimeout(this.powerBIEffectTimer);
+            this.powerBIEffectTimer = null;
+        }
+        if (this.originalSpeed !== null && this.player) {
+            this.player.speed = this.originalSpeed;
+            this.originalSpeed = null;
+        }
+        if (this.player) {
+            this.player.powerBIActive = false; // Reset player's PowerBI state
+        }
+        this.snowflakes = [];
+        this.powerBIs = [];
+        this.powerBIActive = false;
+        
         // Clear all game objects
         this.player = null;
         this.ghosts = [];
@@ -85,6 +115,76 @@ class Game {
         
         // Reset game state
         this.state = GAME_STATES.READY;
+    }
+
+    spawnSnowflakes() {
+        // Clear existing snowflakes
+        this.snowflakes = [];
+        
+        // Spawn two new snowflakes
+        for (let i = 0; i < 2; i++) {
+            let pos = this.findEmptyPosition();
+            // Make sure second snowflake isn't too close to the first one
+            if (i === 1 && this.snowflakes.length > 0) {
+                while (getDistance(pos.x, pos.y, this.snowflakes[0].x, this.snowflakes[0].y) < CELL_SIZE * 5) {
+                    pos = this.findEmptyPosition();
+                }
+            }
+            
+            this.snowflakes.push({
+                x: pos.x,
+                y: pos.y,
+                width: CELL_SIZE - 4,
+                height: CELL_SIZE - 4,
+                pulseAngle: Math.random() * Math.PI * 2, // Random start angle
+                active: true
+            });
+        }
+
+        // Set timer to respawn snowflakes after 15 seconds
+        if (this.snowflakeTimer) {
+            clearTimeout(this.snowflakeTimer);
+        }
+        this.snowflakeTimer = setTimeout(() => {
+            if (this.level === 3 && this.state === GAME_STATES.PLAYING) {
+                this.spawnSnowflakes();
+            }
+        }, 15000);
+    }
+
+    spawnPowerBIs() {
+        // Clear existing PowerBIs
+        this.powerBIs = [];
+        
+        // Spawn two new PowerBIs
+        for (let i = 0; i < 2; i++) {
+            let pos = this.findEmptyPosition();
+            // Make sure second PowerBI isn't too close to the first one
+            if (i === 1 && this.powerBIs.length > 0) {
+                while (getDistance(pos.x, pos.y, this.powerBIs[0].x, this.powerBIs[0].y) < CELL_SIZE * 5) {
+                    pos = this.findEmptyPosition();
+                }
+            }
+            
+            this.powerBIs.push({
+                x: pos.x,
+                y: pos.y,
+                width: CELL_SIZE - 4,
+                height: CELL_SIZE - 4,
+                pulseAngle: Math.random() * Math.PI * 2,
+                active: true
+            });
+        }
+
+        // Set timer to respawn PowerBIs after 15 seconds
+        if (this.powerBITimer) {
+            clearTimeout(this.powerBITimer);
+        }
+        this.powerBITimer = setTimeout(() => {
+            if (this.level === 3 && this.state === GAME_STATES.PLAYING) {
+                this.spawnPowerBIs();
+            }
+        }, 15000);
     }
 
     initGame() {
@@ -105,13 +205,19 @@ class Game {
             startY = 26 * CELL_SIZE;
             ghostY = 1 * CELL_SIZE;
         } else {
-            // Level 3 - Keboola starts in the bottom open area
             startX = 14 * CELL_SIZE;
-            startY = 26 * CELL_SIZE; // Bottom free space
-            ghostY = 4 * CELL_SIZE;  // Top free space after first walls
+            startY = 26 * CELL_SIZE;
+            ghostY = 4 * CELL_SIZE;
         }
         
+        // Create player first
         this.player = new Player(startX, startY);
+
+        // Initialize snowflakes and PowerBIs for level 3
+        if (this.level === 3) {
+            this.spawnSnowflakes();
+            this.spawnPowerBIs();
+        }
 
         // Get ghost speed from level config
         const config = this.getLevelConfig(this.level);
@@ -133,7 +239,6 @@ class Game {
                 new Ghost(24 * CELL_SIZE, ghostY, '#FFB852', ghostSpeed)
             ];
         } else {
-            // Level 3 - Spread ghosts in the top free space
             this.ghosts = [
                 new Ghost(6 * CELL_SIZE, ghostY, '#FF0000', ghostSpeed),
                 new Ghost(12 * CELL_SIZE, ghostY, '#FFB8FF', ghostSpeed),
@@ -179,62 +284,15 @@ class Game {
         document.addEventListener('keydown', this.keydownHandler);
     }
 
-    checkCollisions() {
-        // Check pellet collection
-        this.maze.pellets.forEach((pellet, index) => {
-            if (checkCollision(this.player, pellet)) {
-                this.maze.pellets.splice(index, 1);
-                this.score += 10;
-                this.updateScore();
-            }
-        });
-
-        // Check key collection
-        const collectedKeyColor = this.maze.collectKey(this.player);
-        if (collectedKeyColor) {
-            // Visual feedback for key collection
-            this.showKeyCollectedMessage(collectedKeyColor);
-            this.score += 50; // Bonus points for collecting a key
-            this.updateScore();
-        }
-
-        // Check ghost collisions
-        for (const ghost of this.ghosts) {
-            if (checkCollision(this.player, ghost)) {
-                this.gameOver();
-                return;
-            }
-        }
-
-        // Check level completion
-        if (this.maze.isComplete()) {
-            if (this.level < 3) {
-                this.level++;
-                this.initGame();
-                this.state = GAME_STATES.READY;
-            } else {
-                this.restartGame();
-            }
-        }
-    }
-
-    showKeyCollectedMessage(keyColor) {
-        // Convert hex color to name for message
-        const colorNames = {
-            '#FF0000': 'Red',
-            '#00FF00': 'Green',
-            '#0000FF': 'Blue'
-        };
-        const colorName = colorNames[keyColor] || 'Unknown';
-        
+    showGameMessage(text, color) {
         // Create and show message
         const message = document.createElement('div');
-        message.textContent = `The ${colorName} buckets are linked!`;
+        message.textContent = text;
         message.style.position = 'absolute';
         message.style.left = '50%';
-        message.style.bottom = '10px';  // Position at bottom
+        message.style.bottom = '10px';
         message.style.transform = 'translateX(-50%)';
-        message.style.color = keyColor;
+        message.style.color = color;
         message.style.fontFamily = '"Press Start 2P"';
         message.style.fontSize = '16px';
         message.style.textShadow = '2px 2px 2px black';
@@ -251,6 +309,17 @@ class Game {
             message.style.opacity = '0';
             setTimeout(() => message.remove(), 1000);
         }, 2000);
+    }
+
+    showKeyCollectedMessage(keyColor) {
+        // Convert hex color to name for message
+        const colorNames = {
+            '#FF0000': 'Red',
+            '#00FF00': 'Green',
+            '#0000FF': 'Blue'
+        };
+        const colorName = colorNames[keyColor] || 'Unknown';
+        this.showGameMessage(`The ${colorName} buckets are linked!`, keyColor);
     }
 
     updateScore() {
@@ -354,6 +423,24 @@ class Game {
             this.player.draw(this.ctx);
         }
         
+        // Draw snowflakes for level 3
+        if (this.level === 3) {
+            this.snowflakes.forEach(snowflake => {
+                if (snowflake.active) {
+                    this.drawSnowflake(snowflake);
+                }
+            });
+        }
+        
+        // Draw PowerBIs for level 3
+        if (this.level === 3) {
+            this.powerBIs.forEach(powerBI => {
+                if (powerBI.active) {
+                    this.drawPowerBI(powerBI);
+                }
+            });
+        }
+        
         if (this.ghosts.length > 0) {
             console.log('Drawing ghosts');
             this.ghosts.forEach(ghost => ghost.draw(this.ctx));
@@ -436,6 +523,93 @@ class Game {
         });
     }
 
+    drawSnowflake(snowflake) {
+        const ctx = this.ctx;
+        ctx.save();
+        
+        // Update pulse animation
+        snowflake.pulseAngle += 0.1;
+        const pulse = Math.sin(snowflake.pulseAngle) * 2;
+        
+        // Draw snowflake
+        ctx.translate(snowflake.x, snowflake.y + pulse);
+        
+        // Main color
+        ctx.fillStyle = '#29B5E8';  // Snowflake blue color
+        
+        // Draw six-pointed snowflake
+        for (let i = 0; i < 6; i++) {
+            ctx.beginPath();
+            ctx.rotate(Math.PI / 3);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, snowflake.width / 2);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#29B5E8';
+            ctx.stroke();
+            
+            // Add small circles at the ends
+            ctx.beginPath();
+            ctx.arc(0, snowflake.width / 2, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Add center circle
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+
+    drawPowerBI(powerBI) {
+        const ctx = this.ctx;
+        ctx.save();
+        
+        // Update pulse animation
+        powerBI.pulseAngle += 0.1;
+        const pulse = Math.sin(powerBI.pulseAngle) * 2;
+        
+        // Draw PowerBI
+        ctx.translate(powerBI.x, powerBI.y + pulse);
+        
+        // PowerBI colors
+        ctx.fillStyle = '#F2C811';  // Power BI gold color
+        ctx.strokeStyle = '#F2C811';
+        
+        // Draw Power BI logo-inspired shape
+        const size = powerBI.width * 0.8; // Make it larger, similar to snowflake
+        
+        // Add glow effect
+        if (this.powerBIActive) {
+            ctx.shadowColor = '#F2C811';
+            ctx.shadowBlur = 10;
+        }
+        
+        // Draw main shape
+        ctx.lineWidth = 3;
+        
+        // Draw three bars of increasing height
+        const barWidth = size / 4;
+        const maxHeight = size * 0.8;
+        
+        // First (shortest) bar
+        ctx.fillRect(-size/2, maxHeight/4, barWidth, maxHeight/2);
+        
+        // Second (medium) bar
+        ctx.fillRect(-size/2 + barWidth * 1.5, 0, barWidth, maxHeight * 0.75);
+        
+        // Third (tallest) bar
+        ctx.fillRect(-size/2 + barWidth * 3, -maxHeight/4, barWidth, maxHeight);
+        
+        // Draw connecting line on top
+        ctx.beginPath();
+        ctx.moveTo(-size/2, maxHeight/4);
+        ctx.lineTo(-size/2 + barWidth * 4, -maxHeight/4);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
     update() {
         const currentTime = performance.now();
         const deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, 0.1);
@@ -448,6 +622,20 @@ class Game {
             
             this.player.update(this.maze);
             this.checkCollisions();
+
+            // Update snowflake and PowerBI animations
+            if (this.level === 3) {
+                this.snowflakes.forEach(snowflake => {
+                    if (snowflake.active) {
+                        snowflake.pulseAngle += deltaTime * 5;
+                    }
+                });
+                this.powerBIs.forEach(powerBI => {
+                    if (powerBI.active) {
+                        powerBI.pulseAngle += deltaTime * 5;
+                    }
+                });
+            }
         }
     }
 
@@ -455,6 +643,239 @@ class Game {
         this.update();
         this.draw();
         this.animationFrameId = requestAnimationFrame(() => this.gameLoop());
+    }
+
+    // Helper function to find an empty position in the maze
+    findEmptyPosition() {
+        // Define valid path coordinates for level 3 - these are the actual free paths in the maze
+        const validPaths = [
+            // Main horizontal paths
+            { y: 1, xStart: 2, xEnd: 25 },     // Top row
+            { y: 4, xStart: 2, xEnd: 25 },     // Second row
+            { y: 7, xStart: 2, xEnd: 25 },     // Third row
+            { y: 18, xStart: 2, xEnd: 25 },    // Fourth row
+            { y: 20, xStart: 2, xEnd: 25 },    // Fifth row
+            { y: 23, xStart: 2, xEnd: 25 },    // Bottom row
+            
+            // Vertical paths
+            { x: 13, yStart: 2, yEnd: 24 },    // Left middle column
+            { x: 14, yStart: 2, yEnd: 24 }     // Right middle column
+        ];
+
+        let position = null;
+        let attempts = 0;
+        const maxAttempts = 20; // Increased attempts to find valid position
+
+        while (!position && attempts < maxAttempts) {
+            const pathIndex = Math.floor(Math.random() * validPaths.length);
+            const path = validPaths[pathIndex];
+            
+            if ('xStart' in path) {
+                // Horizontal path
+                const x = (Math.floor(Math.random() * (path.xEnd - path.xStart + 1)) + path.xStart) * CELL_SIZE + CELL_SIZE / 2;
+                const y = path.y * CELL_SIZE + CELL_SIZE / 2;
+                
+                // Verify position is valid and not too close to player
+                if (!this.maze.checkCollision(x - CELL_SIZE/2, y - CELL_SIZE/2, CELL_SIZE, CELL_SIZE) &&
+                    getDistance(x, y, this.player.x, this.player.y) >= CELL_SIZE * 5) {
+                    position = { x, y };
+                }
+            } else {
+                // Vertical path
+                const x = path.x * CELL_SIZE + CELL_SIZE / 2;
+                const y = (Math.floor(Math.random() * (path.yEnd - path.yStart + 1)) + path.yStart) * CELL_SIZE + CELL_SIZE / 2;
+                
+                // Verify position is valid and not too close to player
+                if (!this.maze.checkCollision(x - CELL_SIZE/2, y - CELL_SIZE/2, CELL_SIZE, CELL_SIZE) &&
+                    getDistance(x, y, this.player.x, this.player.y) >= CELL_SIZE * 5) {
+                    position = { x, y };
+                }
+            }
+            
+            attempts++;
+        }
+
+        // If we couldn't find a valid position after max attempts, use a safe default position
+        if (!position) {
+            position = {
+                x: 13 * CELL_SIZE + CELL_SIZE / 2, // Middle of maze
+                y: 7 * CELL_SIZE + CELL_SIZE / 2   // Upper section of maze
+            };
+        }
+
+        return position;
+    }
+
+    checkCollisions() {
+        // Check pellet collection
+        this.maze.pellets.forEach((pellet, index) => {
+            if (checkCollision(this.player, pellet)) {
+                this.maze.pellets.splice(index, 1);
+                this.score += 10;
+                this.updateScore();
+            }
+        });
+
+        // Check snowflake collisions for level 3
+        if (this.level === 3) {
+            for (let snowflake of this.snowflakes) {
+                if (snowflake.active && checkCollision(this.player, snowflake)) {
+                    snowflake.active = false;
+                    this.originalSpeed = this.player.speed;
+                    this.player.speed = 1.1;
+                    
+                    // Clear existing speed restore timer
+                    if (this.speedRestoreTimer) {
+                        clearTimeout(this.speedRestoreTimer);
+                    }
+                    
+                    // Set timer to restore speed after 5 seconds
+                    this.speedRestoreTimer = setTimeout(() => {
+                        if (this.player && this.originalSpeed !== null) {
+                            this.player.speed = this.originalSpeed;
+                            this.originalSpeed = null;
+                        }
+                    }, 5000);
+
+                    // Show snowflake message
+                    this.showGameMessage('Snowflake! You are slow now!', '#29B5E8');
+
+                    // If all snowflakes are collected, they'll respawn after the timer anyway
+                    break;
+                }
+            }
+        }
+
+        // Check key collection
+        const collectedKeyColor = this.maze.collectKey(this.player);
+        if (collectedKeyColor) {
+            // Visual feedback for key collection
+            this.showKeyCollectedMessage(collectedKeyColor);
+            this.score += 50; // Bonus points for collecting a key
+            this.updateScore();
+        }
+
+        // Check PowerBI collisions for level 3
+        if (this.level === 3) {
+            for (let powerBI of this.powerBIs) {
+                if (powerBI.active && checkCollision(this.player, powerBI)) {
+                    powerBI.active = false;
+                    this.powerBIActive = true;
+                    this.player.powerBIActive = true; // Set player's PowerBI state
+                    this.player.powerBIStartTime = performance.now(); // Set the start time
+                    
+                    // Clear existing PowerBI effect timer
+                    if (this.powerBIEffectTimer) {
+                        clearTimeout(this.powerBIEffectTimer);
+                    }
+                    
+                    // Set timer to end PowerBI effect after 7 seconds
+                    this.powerBIEffectTimer = setTimeout(() => {
+                        this.powerBIActive = false;
+                        this.player.powerBIActive = false; // Reset player's PowerBI state
+                    }, 7000);
+
+                    // Show PowerBI message
+                    this.showGameMessage('Power BI! You can eat ghosts now!', '#F2C811');
+                    break;
+                }
+            }
+
+            // Check ghost collisions with PowerBI effect
+            if (this.powerBIActive) {
+                for (let i = this.ghosts.length - 1; i >= 0; i--) {
+                    const ghost = this.ghosts[i];
+                    // Only check collision if ghost is not frozen
+                    if (!ghost.frozen && checkCollision(this.player, ghost)) {
+                        // Increase score
+                        this.score += 1000;
+                        this.updateScore();
+                        
+                        // Define corner areas where ghosts can respawn
+                        const corners = [
+                            { x: 1, y: 1 },     // Top-left corner
+                            { x: 26, y: 1 },    // Top-right corner
+                            { x: 1, y: 26 },    // Bottom-left corner
+                            { x: 26, y: 26 }    // Bottom-right corner
+                        ];
+                        
+                        // Select corner based on ghost index
+                        const corner = corners[i % corners.length];
+                        
+                        // Try positions around the corner until a valid one is found
+                        const offsets = [
+                            { x: 0, y: 0 },     // Try exact corner first
+                            { x: 1, y: 0 },     // Try one cell right
+                            { x: 0, y: 1 },     // Try one cell down
+                            { x: -1, y: 0 },    // Try one cell left
+                            { x: 0, y: -1 },    // Try one cell up
+                            { x: 1, y: 1 },     // Try diagonal
+                            { x: -1, y: 1 },    // Try diagonal
+                            { x: 1, y: -1 },    // Try diagonal
+                            { x: -1, y: -1 }    // Try diagonal
+                        ];
+                        
+                        let validPosition = false;
+                        let newX = corner.x * CELL_SIZE;
+                        let newY = corner.y * CELL_SIZE;
+                        
+                        for (let offset of offsets) {
+                            const testX = newX + offset.x * CELL_SIZE;
+                            const testY = newY + offset.y * CELL_SIZE;
+                            
+                            if (!this.maze.checkCollision(testX, testY, CELL_SIZE - 2, CELL_SIZE - 2)) {
+                                newX = testX;
+                                newY = testY;
+                                validPosition = true;
+                                break;
+                            }
+                        }
+                        
+                        // If no valid position found in corner, use findEmptyPosition
+                        if (!validPosition) {
+                            const pos = this.findEmptyPosition();
+                            newX = pos.x;
+                            newY = pos.y;
+                        }
+                        
+                        // Reset ghost to valid position
+                        ghost.x = newX;
+                        ghost.y = newY;
+                        
+                        // Set ghost to frozen state for 3 seconds
+                        ghost.frozen = true;
+                        if (ghost.frozenTimer) {
+                            clearTimeout(ghost.frozenTimer);
+                        }
+                        ghost.frozenTimer = setTimeout(() => {
+                            ghost.frozen = false;
+                        }, 3000);
+                        
+                        // Show score message
+                        this.showGameMessage('+1000 Points!', '#F2C811');
+                    }
+                }
+            } else {
+                // Normal ghost collision check (game over)
+                for (const ghost of this.ghosts) {
+                    if (checkCollision(this.player, ghost)) {
+                        this.gameOver();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Check level completion
+        if (this.maze.isComplete()) {
+            if (this.level < 3) {
+                this.level++;
+                this.initGame();
+                this.state = GAME_STATES.READY;
+            } else {
+                this.restartGame();
+            }
+        }
     }
 }
 

@@ -8,9 +8,16 @@ class Ghost {
         this.direction = DIRECTIONS.LEFT;
         this.speed = speed;
         this.nextDirectionChange = 0;
+        this.frozen = false;
+        this.frozenTimer = null;
     }
 
     update(maze, deltaTime) {
+        // If frozen, don't move
+        if (this.frozen) {
+            return;
+        }
+
         // Check if current direction leads to a wall
         const nextX = this.x + this.direction.x * this.speed;
         const nextY = this.y + this.direction.y * this.speed;
@@ -66,8 +73,15 @@ class Ghost {
         ctx.lineTo(-this.width/2, this.height/3);
         ctx.closePath();
 
-        // Fill with ghost color
-        ctx.fillStyle = this.color;
+        // Fill with ghost color - make frozen ghosts more transparent and add blue tint
+        if (this.frozen) {
+            ctx.fillStyle = '#80C8FF80'; // Light blue with 50% transparency
+            ctx.shadowColor = '#29B5E8';
+            ctx.shadowBlur = 10;
+        } else {
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 0;
+        }
         ctx.fill();
 
         // Draw eyes
@@ -102,5 +116,12 @@ class Ghost {
         this.y = y;
         this.direction = DIRECTIONS.LEFT;
         this.nextDirectionChange = 0;
+        
+        // Clear frozen state
+        this.frozen = false;
+        if (this.frozenTimer) {
+            clearTimeout(this.frozenTimer);
+            this.frozenTimer = null;
+        }
     }
 } 
