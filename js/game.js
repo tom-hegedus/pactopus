@@ -1,6 +1,7 @@
 class Game {
     constructor(canvas) {
-        console.log('Game constructor called');
+        // Only log important initialization events
+        console.log('Initializing game...');
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.score = 0;
@@ -22,36 +23,39 @@ class Game {
         this.gooddataActive = false; // Track if Gooddata effect is active
         this.powerBIEffectTimer = null;  // Timer for PowerBI effect duration
         this.gooddataEffectTimer = null; // Timer for Gooddata effect duration
-        this.setupLevelSelector();
-        this.initGame();
-        console.log('Game initialized');
-        this.gameLoop();
-    }
-
-    setupLevelSelector() {
-        const buttons = document.querySelectorAll('.level-btn');
-        buttons.forEach(button => {
-            button.addEventListener('click', () => {
-                const selectedLevel = parseInt(button.dataset.level);
-                this.switchLevel(selectedLevel);
-                
-                // Update active button
-                buttons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-            });
-        });
         
-        // Set initial active button
-        buttons[0].classList.add('active');
-    }
+        // Initialize background music with proper settings
+        this.bgMusic = document.getElementById('bgMusic');
+        this.bgMusic.volume = 0.5;
+        this.bgMusic.loop = true;
+        this.musicPlaying = false;
+        
+        // Add event listeners for audio
+        this.bgMusic.addEventListener('pause', () => {
+            // If music should be playing but was paused, try to resume
+            if (this.musicPlaying && this.state === GAME_STATES.PLAYING) {
+                this.resumeMusic();
+            }
+        });
 
-    switchLevel(newLevel) {
-        this.level = newLevel;
-        this.score = 0;
-        this.updateScore();
-        document.getElementById('level').textContent = `Level: ${this.level}`;
+        this.bgMusic.addEventListener('ended', () => {
+            // If music ended but should be playing, restart it
+            if (this.musicPlaying && this.state === GAME_STATES.PLAYING) {
+                this.bgMusic.currentTime = 0;
+                this.resumeMusic();
+            }
+        });
+
+        // Handle audio context resuming with improved error handling
+        document.addEventListener('click', () => {
+            if (!this.musicPlaying && this.state === GAME_STATES.PLAYING) {
+                this.startMusic();
+            }
+        }, { once: true });
+
         this.initGame();
-        this.state = GAME_STATES.READY;
+        console.log('Game initialization complete');
+        this.gameLoop();
     }
 
     getLevelConfig(level) {
@@ -127,7 +131,7 @@ class Game {
         this.ghosts = [];
         this.maze = null;
         
-        // Reset game state
+        // Reset game state but don't cancel animation frame
         this.state = GAME_STATES.READY;
     }
 
@@ -308,17 +312,20 @@ class Game {
             }
             
             if (action === 'RESTART') {
-                this.restartGame();
+                if (this.state === GAME_STATES.GAME_OVER) {
+                    this.restartGame();
+                }
                 return;
             }
             
             if (Object.values(DIRECTIONS).includes(DIRECTIONS[action])) {
                 this.player.setDirection(DIRECTIONS[action]);
                 
-                // Start game on first movement keypress
+                // Start game and music on first movement keypress
                 if (this.state === GAME_STATES.READY) {
                     this.lastFrameTime = performance.now();
                     this.state = GAME_STATES.PLAYING;
+                    this.startMusic();
                 }
             }
         };
@@ -370,7 +377,7 @@ class Game {
 
     setState(newState) {
         this.state = newState;
-        this.lastFrameTime = performance.now(); // Reset timing on state change
+        this.lastFrameTime = performance.now();
         
         if (newState === GAME_STATES.READY) {
             // Reset positions based on level
@@ -384,7 +391,6 @@ class Game {
                 startY = 26 * CELL_SIZE;
                 ghostY = 1 * CELL_SIZE;
             } else {
-                // Level 3 - Match initGame positions
                 startX = 14 * CELL_SIZE;
                 startY = 26 * CELL_SIZE;
                 ghostY = 4 * CELL_SIZE;
@@ -407,11 +413,22 @@ class Game {
                     ghost.reset(ghostXPositions[index] * CELL_SIZE, ghostY);
                 });
             } else {
-                // Level 3 - Match initGame positions
                 const ghostXPositions = [6, 12, 16, 22];
                 this.ghosts.forEach((ghost, index) => {
                     ghost.reset(ghostXPositions[index] * CELL_SIZE, ghostY);
                 });
+            }
+        } else if (newState === GAME_STATES.PLAYING) {
+            // Ensure music is playing during gameplay
+            if (!this.musicPlaying) {
+                this.startMusic();
+            } else {
+                this.resumeMusic();
+            }
+        } else if (newState === GAME_STATES.GAME_OVER) {
+            // Only stop music if game is truly over (level 3 complete or death)
+            if (this.level === 3 && this.maze.isComplete()) {
+                this.stopMusic();
             }
         }
     }
@@ -423,49 +440,31 @@ class Game {
         this.updateScore();
         document.getElementById('level').textContent = `Level: ${this.level}`;
 
-        // Update level selector
-        const buttons = document.querySelectorAll('.level-btn');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        buttons[0].classList.add('active');
-
-        // Stop the current game loop
-        if (this.animationFrameId) {
-            cancelAnimationFrame(this.animationFrameId);
-            this.animationFrameId = null;
-        }
-
         // Reset all game objects
         this.cleanup();
         this.initGame();
 
-        // Start fresh game loop
+        // Reset timing and ensure game loop continues
         this.lastFrameTime = performance.now();
-        this.gameLoop();
-    }
-
-    gameOver() {
-        this.state = GAME_STATES.GAME_OVER;
+        
+        // Start music if it was playing before
+        if (this.musicPlaying) {
+            this.startMusic();
+        }
     }
 
     draw() {
-        console.log('Drawing frame');
-        // Clear canvas
+        // Remove all console.log statements from draw method
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw game elements
         if (this.maze) {
-            console.log('Drawing maze');
-            this.maze.draw(this.ctx, this.gooddataActive);  // Pass gooddataActive to control pellet color
-        } else {
-            console.log('No maze to draw');
+            this.maze.draw(this.ctx, this.gooddataActive);
         }
         
         if (this.player) {
-            console.log('Drawing player');
             this.player.draw(this.ctx);
         }
         
-        // Draw snowflakes, PowerBIs, and Gooddatas for level 3
         if (this.level === 3) {
             this.snowflakes.forEach(snowflake => {
                 if (snowflake.active) {
@@ -487,51 +486,60 @@ class Game {
         }
         
         if (this.ghosts.length > 0) {
-            console.log('Drawing ghosts');
             this.ghosts.forEach(ghost => ghost.draw(this.ctx));
         }
 
-        // Draw semi-transparent overlay for READY and GAME OVER states
+        // Draw overlays and UI
         if (this.state === GAME_STATES.READY || this.state === GAME_STATES.GAME_OVER) {
             this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
 
-        // Draw ready screen text
         if (this.state === GAME_STATES.READY) {
-            const config = this.getLevelConfig(this.level);
-            this.ctx.textAlign = 'center';
-            
-            // Draw level name
-            this.ctx.fillStyle = '#4CAF50';
-            this.ctx.font = '20px "Press Start 2P"';
-            this.ctx.fillText(`Level ${this.level}: ${config.name}`, this.canvas.width / 2, this.canvas.height / 2 - 60);
-            
-            // Draw level description
-            this.ctx.fillStyle = '#90CAF9';
-            this.ctx.font = '12px "Press Start 2P"';
-            config.description.forEach((line, index) => {
-                this.ctx.fillText(line, this.canvas.width / 2, this.canvas.height / 2 - 20 + (index * 20));
-            });
-            
-            // Draw controls text with more padding (increased from 80/110 to 120/150)
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.font = '16px "Press Start 2P"';
-            this.ctx.fillText('Use arrow keys to move', this.canvas.width / 2, this.canvas.height / 2 + 120);
-            this.ctx.fillText('Press any to start', this.canvas.width / 2, this.canvas.height / 2 + 150);
+            this.drawReadyScreen();
         }
 
-        // Draw game over screen text
         if (this.state === GAME_STATES.GAME_OVER) {
-            this.ctx.fillStyle = '#ff0000';
-            this.ctx.font = '32px "Press Start 2P"';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
-            
-            this.ctx.font = '16px "Press Start 2P"';
-            this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
-            this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 50);
+            if (this.level === 3 && this.maze.isComplete()) {
+                this.showFinishScreen();
+            } else {
+                this.drawGameOverScreen();
+            }
         }
+    }
+
+    drawReadyScreen() {
+        const config = this.getLevelConfig(this.level);
+        this.ctx.textAlign = 'center';
+        
+        // Draw level name
+        this.ctx.fillStyle = '#4CAF50';
+        this.ctx.font = '20px "Press Start 2P"';
+        this.ctx.fillText(`Level ${this.level}: ${config.name}`, this.canvas.width / 2, this.canvas.height / 2 - 60);
+        
+        // Draw level description
+        this.ctx.fillStyle = '#90CAF9';
+        this.ctx.font = '12px "Press Start 2P"';
+        config.description.forEach((line, index) => {
+            this.ctx.fillText(line, this.canvas.width / 2, this.canvas.height / 2 - 20 + (index * 20));
+        });
+        
+        // Draw controls text
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '16px "Press Start 2P"';
+        this.ctx.fillText('Use arrow keys to move', this.canvas.width / 2, this.canvas.height / 2 + 120);
+        this.ctx.fillText('Press any to start', this.canvas.width / 2, this.canvas.height / 2 + 150);
+    }
+
+    drawGameOverScreen() {
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.font = '32px "Press Start 2P"';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 20);
+        
+        this.ctx.font = '16px "Press Start 2P"';
+        this.ctx.fillText(`Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
+        this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 50);
     }
 
     drawKeyIndicator() {
@@ -701,6 +709,12 @@ class Game {
         const deltaTime = Math.min((currentTime - this.lastFrameTime) / 1000, 0.1);
         this.lastFrameTime = currentTime;
 
+        // Check music state periodically during gameplay
+        if (this.state === GAME_STATES.PLAYING && this.musicPlaying && 
+            (this.bgMusic.paused || this.bgMusic.ended)) {
+            this.resumeMusic();
+        }
+
         // Only update player and ghosts during gameplay
         if (this.state === GAME_STATES.PLAYING) {
             // Update ghosts
@@ -726,8 +740,14 @@ class Game {
     }
 
     gameLoop() {
+        // Always update and draw, regardless of state
         this.update();
         this.draw();
+        
+        // Make sure we keep the loop going
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
         this.animationFrameId = requestAnimationFrame(() => this.gameLoop());
     }
 
@@ -803,6 +823,34 @@ class Game {
             }
         });
 
+        // Check ghost collisions - for all levels
+        if (this.level === 3 && this.powerBIActive) {
+            // PowerBI effect ghost eating logic for level 3
+            for (let i = this.ghosts.length - 1; i >= 0; i--) {
+                const ghost = this.ghosts[i];
+                // Only check collision if ghost is not frozen
+                if (!ghost.frozen && checkCollision(this.player, ghost)) {
+                    // Increase score
+                    this.score += 1000;
+                    this.updateScore();
+                    
+                    // Show score message ONLY when ghost eaten
+                    this.showGameMessage('+1000 Points!', '#F2C811');
+                    
+                    // Reset ghost position and set frozen state
+                    this.resetGhost(ghost, i);
+                }
+            }
+        } else {
+            // Normal ghost collision check (game over) - for all levels
+            for (const ghost of this.ghosts) {
+                if (checkCollision(this.player, ghost)) {
+                    this.gameOver();
+                    return;
+                }
+            }
+        }
+
         // Only check special element collisions for level 3
         if (this.level === 3) {
             // Check snowflake collisions
@@ -877,90 +925,6 @@ class Game {
                     break;
                 }
             }
-
-            // Check ghost collisions with PowerBI effect
-            if (this.powerBIActive) {
-                for (let i = this.ghosts.length - 1; i >= 0; i--) {
-                    const ghost = this.ghosts[i];
-                    // Only check collision if ghost is not frozen
-                    if (!ghost.frozen && checkCollision(this.player, ghost)) {
-                        // Increase score
-                        this.score += 1000;
-                        this.updateScore();
-                        
-                        // Show score message ONLY when ghost eaten
-                        this.showGameMessage('+1000 Points!', '#F2C811');
-                        
-                        // Define corner areas where ghosts can respawn
-                        const corners = [
-                            { x: 1, y: 1 },     // Top-left corner
-                            { x: 26, y: 1 },    // Top-right corner
-                            { x: 1, y: 26 },    // Bottom-left corner
-                            { x: 26, y: 26 }    // Bottom-right corner
-                        ];
-                        
-                        // Select corner based on ghost index
-                        const corner = corners[i % corners.length];
-                        
-                        // Try positions around the corner until a valid one is found
-                        const offsets = [
-                            { x: 0, y: 0 },     // Try exact corner first
-                            { x: 1, y: 0 },     // Try one cell right
-                            { x: 0, y: 1 },     // Try one cell down
-                            { x: -1, y: 0 },    // Try one cell left
-                            { x: 0, y: -1 },    // Try one cell up
-                            { x: 1, y: 1 },     // Try diagonal
-                            { x: -1, y: 1 },    // Try diagonal
-                            { x: 1, y: -1 },    // Try diagonal
-                            { x: -1, y: -1 }    // Try diagonal
-                        ];
-                        
-                        let validPosition = false;
-                        let newX = corner.x * CELL_SIZE;
-                        let newY = corner.y * CELL_SIZE;
-                        
-                        for (let offset of offsets) {
-                            const testX = newX + offset.x * CELL_SIZE;
-                            const testY = newY + offset.y * CELL_SIZE;
-                            
-                            if (!this.maze.checkCollision(testX, testY, CELL_SIZE - 2, CELL_SIZE - 2)) {
-                                newX = testX;
-                                newY = testY;
-                                validPosition = true;
-                                break;
-                            }
-                        }
-                        
-                        // If no valid position found in corner, use findEmptyPosition
-                        if (!validPosition) {
-                            const pos = this.findEmptyPosition();
-                            newX = pos.x;
-                            newY = pos.y;
-                        }
-                        
-                        // Reset ghost to valid position
-                        ghost.x = newX;
-                        ghost.y = newY;
-                        
-                        // Set ghost to frozen state for 3 seconds
-                        ghost.frozen = true;
-                        if (ghost.frozenTimer) {
-                            clearTimeout(ghost.frozenTimer);
-                        }
-                        ghost.frozenTimer = setTimeout(() => {
-                            ghost.frozen = false;
-                        }, 3000);
-                    }
-                }
-            } else {
-                // Normal ghost collision check (game over)
-                for (const ghost of this.ghosts) {
-                    if (checkCollision(this.player, ghost)) {
-                        this.gameOver();
-                        return;
-                    }
-                }
-            }
         }
 
         // Check key collection
@@ -976,12 +940,209 @@ class Game {
         if (this.maze.isComplete()) {
             if (this.level < 3) {
                 this.level++;
+                // Update level display
+                document.getElementById('level').textContent = `Level: ${this.level}`;
+                // Don't stop the music between levels
+                const wasPlaying = this.musicPlaying;
                 this.initGame();
                 this.state = GAME_STATES.READY;
+                if (wasPlaying) {
+                    this.startMusic();
+                }
             } else {
-                this.restartGame();
+                // Show finish screen for level 3 completion
+                this.state = GAME_STATES.GAME_OVER;
+                this.showFinishScreen();
+                this.stopMusic();
             }
         }
+    }
+
+    showFinishScreen() {
+        // Draw semi-transparent black overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Set up text properties
+        this.ctx.textAlign = 'center';
+        
+        // Draw congratulations text
+        this.ctx.fillStyle = '#4CAF50';  // Green color
+        this.ctx.font = '24px "Press Start 2P"';
+        this.ctx.fillText('Congratulations!', this.canvas.width / 2, this.canvas.height / 2 - 80);
+        
+        // Draw main message with smaller font (14px instead of 16px)
+        this.ctx.fillStyle = '#90CAF9';  // Light blue color
+        this.ctx.font = '14px "Press Start 2P"';
+        this.ctx.fillText('You seem to know the platform.', this.canvas.width / 2, this.canvas.height / 2 - 30);
+        this.ctx.fillText('But the dark places of Keboola', this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.fillText('awaits...', this.canvas.width / 2, this.canvas.height / 2 + 30);
+        this.ctx.fillText('Let me know', this.canvas.width / 2, this.canvas.height / 2 + 60);
+        this.ctx.fillText('if you want more levels!', this.canvas.width / 2, this.canvas.height / 2 + 85);
+        
+        // Draw signature
+        this.ctx.fillStyle = '#FF3399';  // Pink color (matching Gooddata)
+        this.ctx.font = '20px "Press Start 2P"';
+        this.ctx.fillText('Tom', this.canvas.width / 2, this.canvas.height / 2 + 120);
+        
+        // Draw restart instruction
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '16px "Press Start 2P"';
+        this.ctx.fillText('Press R to restart', this.canvas.width / 2, this.canvas.height / 2 + 180);
+    }
+
+    // Add music control methods
+    startMusic() {
+        if (this.bgMusic && !this.musicPlaying) {
+            this.musicPlaying = true;
+            this.bgMusic.volume = 0.5;
+            this.bgMusic.loop = true;
+            this.bgMusic.currentTime = 0;
+            
+            const playPromise = this.bgMusic.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    if (error.name === 'NotAllowedError') {
+                        // Handle autoplay policy - wait for user interaction
+                        const resumePlayback = () => {
+                            const newPlayPromise = this.bgMusic.play();
+                            if (newPlayPromise) {
+                                newPlayPromise.catch(() => {
+                                    // If it fails again, keep the listener
+                                    document.addEventListener('click', resumePlayback, { once: true });
+                                });
+                            }
+                        };
+                        document.addEventListener('click', resumePlayback, { once: true });
+                    } else {
+                        console.error('Audio playback error:', error);
+                        // Try to recover from other errors
+                        setTimeout(() => {
+                            if (this.musicPlaying && this.state === GAME_STATES.PLAYING) {
+                                this.resumeMusic();
+                            }
+                        }, 1000);
+                    }
+                });
+            }
+        }
+    }
+
+    stopMusic() {
+        if (this.bgMusic) {
+            this.musicPlaying = false;
+            this.bgMusic.pause();
+            this.bgMusic.currentTime = 0;
+        }
+    }
+
+    resumeMusic() {
+        if (this.bgMusic && this.musicPlaying) {
+            // Ensure the audio is in a playable state
+            if (this.bgMusic.paused || this.bgMusic.ended) {
+                if (this.bgMusic.ended) {
+                    this.bgMusic.currentTime = 0;
+                }
+                
+                const playPromise = this.bgMusic.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        if (error.name === 'NotAllowedError') {
+                            // Handle autoplay policy - wait for user interaction
+                            const resumePlayback = () => {
+                                this.bgMusic.play().catch(() => {
+                                    // If it fails again, keep trying
+                                    document.addEventListener('click', resumePlayback, { once: true });
+                                });
+                            };
+                            document.addEventListener('click', resumePlayback, { once: true });
+                        } else {
+                            // For other errors, try again after a short delay
+                            setTimeout(() => {
+                                if (this.musicPlaying && this.state === GAME_STATES.PLAYING) {
+                                    this.resumeMusic();
+                                }
+                            }, 1000);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    pauseMusic() {
+        if (this.bgMusic && this.musicPlaying) {
+            this.bgMusic.pause();
+        }
+    }
+
+    gameOver() {
+        this.state = GAME_STATES.GAME_OVER;
+        this.stopMusic();
+    }
+
+    resetGhost(ghost, index) {
+        // Reset ghost position and set frozen state
+        const corners = [
+            { x: 1, y: 1 },     // Top-left corner
+            { x: 26, y: 1 },    // Top-right corner
+            { x: 1, y: 26 },    // Bottom-left corner
+            { x: 26, y: 26 }    // Bottom-right corner
+        ];
+        
+        // Select corner based on ghost index
+        const corner = corners[index % corners.length];
+        
+        // Try positions around the corner until a valid one is found
+        const offsets = [
+            { x: 0, y: 0 },     // Try exact corner first
+            { x: 1, y: 0 },     // Try one cell right
+            { x: 0, y: 1 },     // Try one cell down
+            { x: -1, y: 0 },    // Try one cell left
+            { x: 0, y: -1 },    // Try one cell up
+            { x: 1, y: 1 },     // Try diagonal
+            { x: -1, y: 1 },    // Try diagonal
+            { x: 1, y: -1 },    // Try diagonal
+            { x: -1, y: -1 }    // Try diagonal
+        ];
+        
+        let validPosition = false;
+        let newX = corner.x * CELL_SIZE;
+        let newY = corner.y * CELL_SIZE;
+        
+        for (let offset of offsets) {
+            const testX = newX + offset.x * CELL_SIZE;
+            const testY = newY + offset.y * CELL_SIZE;
+            
+            if (!this.maze.checkCollision(testX, testY, CELL_SIZE - 2, CELL_SIZE - 2)) {
+                newX = testX;
+                newY = testY;
+                validPosition = true;
+                break;
+            }
+        }
+        
+        // If no valid position found in corner, use findEmptyPosition
+        if (!validPosition) {
+            const pos = this.findEmptyPosition();
+            newX = pos.x;
+            newY = pos.y;
+        }
+        
+        // Reset ghost to valid position
+        ghost.x = newX;
+        ghost.y = newY;
+        
+        // Set ghost to frozen state for 3 seconds
+        ghost.frozen = true;
+        if (ghost.frozenTimer) {
+            clearTimeout(ghost.frozenTimer);
+        }
+        ghost.frozenTimer = setTimeout(() => {
+            ghost.frozen = false;
+        }, 3000);
     }
 }
 
